@@ -6,8 +6,9 @@
     Github: https://github.com/jhonatanmsc/phla-molecular-align
 '''
 from models import Molecule, Resi
-import re
-# import pdb
+from Bio import pairwise2
+from Bio.pairwise2 import align
+import pdb
 
 
 def load_molecules(filename: str, dbname='#'):
@@ -26,110 +27,106 @@ def load_molecules(filename: str, dbname='#'):
         for molecule_str in molecules_str:
             mol_str = molecule_str.split('\n', 1)
             mol_str[1] = mol_str[1].replace('\n', '')
-            pre_gsh = mol_str[1][:mol_str[1].find('GSH')]
-            pos_gsh = mol_str[1][mol_str[1].find('GSH'):]
 
-            seq = []
-            for i in range(len(pre_gsh)):
-                resi = Resi(pos=i-len(pre_gsh), name=pre_gsh[i])
-                seq.append(resi)
+            # ignore null alleles
+            if mol_str[0].find('N') == 0:
+                continue
 
-            for i in range(len(pos_gsh)):
-                resi = Resi(pos=i, name=pos_gsh[i])
-                seq.append(resi)
-            name = re.search(r'[A-Z]\*[\d]{2}\:[\d]{2}', mol_str[0])
+            # ignore lower alleles
+            if mol_str[0].find('L') == 0:
+                continue
+
+            # ignore questionable alleles
+            if mol_str[0].find('Q') == 0:
+                continue
+
+            # ignore secreted
+            if mol_str[0].find('S') == 0:
+                continue
+
+            # ignore aberrant
+            if mol_str[0].find('A') == 0 and mol_str[0].find('C') == 0:
+                continue
+
+            name = mol_str[0].split(' ')[1] if ' ' in mol_str[0] else mol_str[0]
+
             if name:
-                name = name.group()
+                if name.find(':') > 2:
+                    name = name.split(':')[0] + ':' + name.split(':')[1]
+
+                if name in molecules:
+                    continue
+
             else:
                 name = ''
-            mol = Molecule(dbname=dbname, name=name, seq=seq)
+            
+            mol = Molecule(dbname=dbname, name=name, seq=mol_str[1])
             molecules[name] = mol
 
     return molecules
 
 
-def align_molecules(mol1: Molecule, mol2: Molecule):
+def format_alignment(mol1: Molecule, mol2: Molecule):
     '''### Do alignment of two molecules
         #### params:
-        - mol1, mol2: Your molecule to align
+        - mol1, mol2: Youincluder molecule to align
         
         *returns* -> Molecule with alignment result and indentity
     '''
+    alignment = align.globalxx(mol1.seq, mol2.seq)[0]
     header = ''
     seq_mol1 = ''
     seq_mol2 = ''
     result = ''
     body = ''
-    lines = 1
     count = 0
-    positions = mol1.all_pos() + list(set(mol2.all_pos()) - set(mol1.all_pos()))
-    positions.sort()
+    
+    for i in range(alignment[4]):
+        seq_mol1 += alignment[0][i]
+        seq_mol2 += alignment[1][i]
 
-    for pos in positions:
-        mol1_resi = mol1.resi_name(pos)
-        mol2_resi = mol2.resi_name(pos)
-        if mol1_resi and mol2_resi:
-            if mol1_resi == mol2_resi:
-                result += '*'
-                count += 1
-            else:
-                result += '_'
-            seq_mol1 += mol1_resi.name
-            seq_mol2 += mol2_resi.name
-        elif mol1_resi:
-            seq_mol1 += mol1_resi.name
-            seq_mol2 += ' '
-            result += '_'
-        elif mol2_resi:
-            seq_mol1 += ' '
-            seq_mol2 += mol2_resi.name
-            result += '_'
+        if alignment[0][i] == alignment[1][i]:
+            count += 1
+            result += '|'  
         else:
             result += ' '
-
-        if lines % 60 == 0:
-            nw_lines = len(str(lines-59))
-            nq_lines = 8-nw_lines
-            n_lines = (' ' * nq_lines) + str(lines-59)
-            body += f"{n_lines} {seq_mol1}\n"
-            body += f"{n_lines} {seq_mol2}\n"
-            body += f"{'        '} {result}\n"
-
+        
+        if (i+1) % 60 == 0:
+            body += f"{seq_mol1}\n{result}\n{seq_mol2}\n\n"
             result = ''
             seq_mol1 = ''
             seq_mol2 = ''
-        lines += 1
 
-    header = "< %s - %s | %s | %d%%\n" % (mol1.dbname,
-                                          mol2.dbname, mol1.name, (count / len(mol1.seq)) * 100)
+    identity = len(mol1.seq)/count
+    pdb.set_trace()
+    header = "< %s - %s | %s | %.1f%%\n" % (mol1.dbname,
+                                          mol2.dbname, mol1.name, identity * 100)
     text = header + body
     
     return {
         'text': text,
-        'identity': (count / len(mol1.seq))
+        'identity': identity
     }
 
 
 def main():
     molecules = {
         'p3d': load_molecules('molecules/phla3d.fasta', 'p3d'),
-        'imgt': load_molecules('molecules/imgthla.fasta', 'imgt')
+        'imgt': load_molecules('molecules/imgthla.fasta', 'imgt'),
     }
 
-    alignments = []
+    alignments_formated = []
     for molname in molecules['p3d']:
-        mol1 = molecules['p3d'][molname]
-        mol2 = molecules['imgt'][molname]
-        result = align_molecules(mol1, mol2)
-        alignments.append(result)
+        alignments_formated.append(format_alignment(molecules['p3d'][molname], molecules['imgt'][molname]))
 
     alignment_ok = ''
     alignment_err = ''
-    for alignment in alignments:
+    for alignment in alignments_formated:
         if alignment['identity'] == 1:
             alignment_ok += alignment['text']
         else:
             alignment_err += alignment['text']
+
     if alignment_err != '':
         with open('alignment-err.txt', 'w') as file:
             file.write(alignment_err)
