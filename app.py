@@ -5,7 +5,7 @@
     Author: Jhonatanmsc
     Github: https://github.com/jhonatanmsc/phla-molecular-align
 '''
-from models import Molecule, Resi
+from models import Molecule
 from Bio import pairwise2
 from Bio.pairwise2 import align
 import pdb
@@ -16,7 +16,7 @@ def load_molecules(filename: str, dbname='#'):
         #### params:
         - filename: Your file name
         - dbname: Name of your data base
-        
+
         *returns* -> dict with molecules
     '''
     molecules = {}
@@ -48,7 +48,8 @@ def load_molecules(filename: str, dbname='#'):
             if mol_str[0].find('A') == 0 and mol_str[0].find('C') == 0:
                 continue
 
-            name = mol_str[0].split(' ')[1] if ' ' in mol_str[0] else mol_str[0]
+            name = mol_str[0].split(
+                ' ')[1] if ' ' in mol_str[0] else mol_str[0]
 
             if name:
                 if name.find(':') > 2:
@@ -59,7 +60,7 @@ def load_molecules(filename: str, dbname='#'):
 
             else:
                 name = ''
-            
+
             mol = Molecule(dbname=dbname, name=name, seq=mol_str[1])
             molecules[name] = mol
 
@@ -70,7 +71,7 @@ def format_alignment(mol1: Molecule, mol2: Molecule):
     '''### Do alignment of two molecules
         #### params:
         - mol1, mol2: Youincluder molecule to align
-        
+
         *returns* -> Molecule with alignment result and indentity
     '''
     alignment = align.globalxx(mol1.seq, mol2.seq)[0]
@@ -80,17 +81,17 @@ def format_alignment(mol1: Molecule, mol2: Molecule):
     result = ''
     body = ''
     count = 0
-    
+
     for i in range(alignment[4]):
         seq_mol1 += alignment[0][i]
         seq_mol2 += alignment[1][i]
 
         if alignment[0][i] == alignment[1][i]:
             count += 1
-            result += '|'  
+            result += '|'
         else:
             result += ' '
-        
+
         if (i+1) % 60 == 0:
             body += f"{seq_mol1}\n{result}\n{seq_mol2}\n\n"
             result = ''
@@ -100,9 +101,9 @@ def format_alignment(mol1: Molecule, mol2: Molecule):
     identity = len(mol1.seq)/count
     pdb.set_trace()
     header = "< %s - %s | %s | %.1f%%\n" % (mol1.dbname,
-                                          mol2.dbname, mol1.name, identity * 100)
+                                            mol2.dbname, mol1.name, identity * 100)
     text = header + body
-    
+
     return {
         'text': text,
         'identity': identity
@@ -117,7 +118,8 @@ def main():
 
     alignments_formated = []
     for molname in molecules['p3d']:
-        alignments_formated.append(format_alignment(molecules['p3d'][molname], molecules['imgt'][molname]))
+        alignments_formated.append(format_alignment(
+            molecules['p3d'][molname], molecules['imgt'][molname]))
 
     alignment_ok = ''
     alignment_err = ''
