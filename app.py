@@ -98,8 +98,7 @@ def format_alignment(mol1: Molecule, mol2: Molecule):
             seq_mol1 = ''
             seq_mol2 = ''
 
-    identity = len(mol1.seq)/count
-    pdb.set_trace()
+    identity = count/len(mol1.seq)
     header = "< %s - %s | %s | %.1f%%\n" % (mol1.dbname,
                                             mol2.dbname, mol1.name, identity * 100)
     text = header + body
