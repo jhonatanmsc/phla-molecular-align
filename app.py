@@ -28,38 +28,29 @@ def load_molecules(filename: str, dbname='#'):
             mol_str = molecule_str.split('\n', 1)
             mol_str[1] = mol_str[1].replace('\n', '')
 
-            # ignore null alleles
-            if mol_str[0].find('N') == 0:
+            ignorable_alleles = ['N', 'L', 'Q', 'S', 'A', 'C']
+
+            name = mol_str[0].split(' ')
+            if len(name) > 2:
+                name = name[1]
+            elif len(name) > 1:
+                name = name[0]
+            else:
+                name = name[0]
+
+            if any(name.endswith(allele) for allele in ignorable_alleles):
+                print('ignorated ', name)
                 continue
-
-            # ignore lower alleles
-            if mol_str[0].find('L') == 0:
-                continue
-
-            # ignore questionable alleles
-            if mol_str[0].find('Q') == 0:
-                continue
-
-            # ignore secreted
-            if mol_str[0].find('S') == 0:
-                continue
-
-            # ignore aberrant
-            if mol_str[0].find('A') == 0 and mol_str[0].find('C') == 0:
-                continue
-
-            name = mol_str[0].split(
-                ' ')[1] if ' ' in mol_str[0] else mol_str[0]
-
+            
             if name:
                 if name.find(':') > 2:
-                    name = name.split(':')[0] + ':' + name.split(':')[1]
+                    name = ':'.join(name.split(':', 2)[:2])
 
-                if name in molecules:
+                if any(subname in molecules for subname in name):
                     continue
 
             else:
-                name = ''
+                name = 'None'
 
             mol = Molecule(dbname=dbname, name=name, seq=mol_str[1])
             molecules[name] = mol
@@ -117,8 +108,9 @@ def main():
 
     alignments_formated = []
     for molname in molecules['p3d']:
-        alignments_formated.append(format_alignment(
-            molecules['p3d'][molname], molecules['imgt'][molname]))
+        if molname in molecules['p3d'] and molname in molecules['imgt']:
+            alignments_formated.append(format_alignment(
+                molecules['p3d'][molname], molecules['imgt'][molname]))
 
     alignment_ok = ''
     alignment_err = ''
