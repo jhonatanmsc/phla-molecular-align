@@ -8,6 +8,7 @@
 from models import Molecule
 from Bio import pairwise2
 from Bio.pairwise2 import align
+from Bio.SubsMat.MatrixInfo import blosum62
 import pdb
 
 
@@ -61,35 +62,46 @@ def load_molecules(filename: str, dbname='#'):
 def format_alignment(mol1: Molecule, mol2: Molecule):
     '''### Do alignment of two molecules
         #### params:
-        - mol1, mol2: Youincluder molecule to align
+        - mol1, mol2: You includer molecule to align
 
         *returns* -> Molecule with alignment result and indentity
     '''
-    alignment = align.globalxx(mol1.seq, mol2.seq)[0]
+    alignment = align.localds(mol1.seq, mol2.seq,  blosum62, -12, -4)
+    
+    alignment_formated = pairwise2.format_alignment(*alignment[0])
+    alignment_formated = alignment_formated.split('\n')
+    
     header = ''
-    seq_mol1 = ''
-    seq_mol2 = ''
+    seq_mol1 = alignment_formated[0]
+    seq_mol2 = alignment_formated[2]
+    result_raw = alignment_formated[1]
+    identity = alignment[0][-1]
+
+    body_mol1 = ''
+    body_mol2 = ''
     result = ''
     body = ''
     count = 0
+    errors = 0
 
-    for i in range(alignment[4]):
-        seq_mol1 += alignment[0][i]
-        seq_mol2 += alignment[1][i]
+    for i in range(len(seq_mol1)):
+        body_mol1 += seq_mol1[i]
+        body_mol2 += seq_mol2[i]
+        result += result_raw[i]
 
-        if alignment[0][i] == alignment[1][i]:
-            count += 1
-            result += '|'
-        else:
-            result += ' '
+        if not seq_mol1[i].isnumeric() and seq_mol1[i] != ' ':
+            if seq_mol1[i] == seq_mol2[i]:
+                count += 1
+            else:
+                errors += 1
 
         if (i+1) % 60 == 0:
-            body += f"{seq_mol1}\n{result}\n{seq_mol2}\n\n"
+            body += f"{body_mol1}\n{result}\n{body_mol2}\n\n"
             result = ''
-            seq_mol1 = ''
-            seq_mol2 = ''
+            body_mol1 = ''
+            body_mol2 = ''
 
-    identity = count/len(mol1.seq)
+    identity = count/(count + errors)
     header = "< %s - %s | %s | %.1f%%\n" % (mol1.dbname,
                                             mol2.dbname, mol1.name, identity * 100)
     text = header + body
